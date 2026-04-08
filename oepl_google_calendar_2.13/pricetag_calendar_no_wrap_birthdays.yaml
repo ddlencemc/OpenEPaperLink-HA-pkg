@@ -1,0 +1,305 @@
+oepl_calendar_google_no_wrap:
+  template:
+  script:
+
+    update_google_calendar_tag_no_wrap:
+      alias: Update Google calendar tag no wrap
+      mode: restart
+      sequence:
+        - action: calendar.get_events
+          target:
+            entity_id:
+              - calendar.<YOUR_MAIN_GMIL_CALENDAR> # Example jonh_smit_gmail_com
+              - calendar.birthdays
+          data:
+            duration:
+              days: 14
+          response_variable: agenda
+
+        - variables:
+            main_events: "{{ agenda['calendar.<YOUR_MAIN_GMIL_CALENDAR>']['events'] | default([], true) }}"
+            birthday_events: "{{ agenda['calendar.birthdays']['events'] | default([], true) }}"
+            header_date: "{{ now().strftime('%d.%m.%Y') }}"
+
+            oncall_title: >-
+              {% set ns = namespace(title='') %}
+              {% for e in main_events %}
+                {% set summary = e.summary | default('') %}
+                {% set start = e.start | as_datetime | as_local %}
+                {% set end = e.end | as_datetime | as_local %}
+                {% set is_oncall = 'on-call' in (summary | lower) or 'oncall' in (summary | lower) %}
+                {% if is_oncall and start <= now() and now() < end %}
+                  {% set end_display = end - timedelta(days=1) %}
+                  {% set ns.title = start.strftime('%d.%m') ~ '-' ~ end_display.strftime('%d.%m') ~ ' ' ~ summary %}
+                {% endif %}
+              {% endfor %}
+              {{ ns.title }}
+
+            layout_json: >-
+              {% set ns = namespace(events=[], lines=[]) %}
+
+              {% for e in main_events %}
+                {% set summary = e.summary | default('') %}
+                {% set start = e.start | as_datetime | as_local %}
+                {% set end = e.end | as_datetime | as_local %}
+                {% set is_oncall = 'on-call' in (summary | lower) or 'oncall' in (summary | lower) %}
+                {% set is_allday = start.strftime('%H:%M') == '00:00' and end.strftime('%H:%M') == '00:00' %}
+                {% set is_active_oncall = is_oncall and start <= now() and now() < end %}
+                {% if end > now() and not is_active_oncall %}
+                  {% set prefix = start.strftime('%d.%m') ~ ' ' ~ ('весь день' if is_allday else start.strftime('%H:%M')) %}
+                  {% set ns.events = ns.events + [
+                    {
+                      'sort': start.isoformat(),
+                      'text': prefix ~ '  ' ~ summary,
+                      'active': (start <= now() and now() < end)
+                    }
+                  ] %}
+                {% endif %}
+              {% endfor %}
+
+              {% for e in birthday_events %}
+                {% set summary = e.summary | default('') %}
+                {% set start = e.start | as_datetime | as_local %}
+                {% set end = e.end | as_datetime | as_local %}
+                {% set ns.events = ns.events + [
+                  {
+                    'sort': start.isoformat(),
+                    'text': start.strftime('%d.%m') ~ ' 🎂  ' ~ summary,
+                    'active': (start <= now() and now() < end)
+                  }
+                ] %}
+              {% endfor %}
+
+              {% set sorted_events = ns.events | sort(attribute='sort') %}
+              {% set max_lines = 5 if oncall_title != '' else 6 %}
+              {% set max_events = 6 %}
+
+              {% for ev in sorted_events[:max_events] %}
+                {% set one_line = ev.text %}
+                {% if one_line | length > 31 %}
+                  {% set one_line = one_line[:28] ~ '...' %}
+                {% endif %}
+                {% set ns.lines = ns.lines + [{'text': one_line, 'cont': false, 'active': ev.active}] %}
+              {% endfor %}
+
+              {% for i in range(max_lines - (ns.lines | count)) %}
+                {% set ns.lines = ns.lines + [{'text': '', 'cont': false, 'active': false}] %}
+              {% endfor %}
+
+              {% if max_lines < 6 %}
+                {% for i in range(6 - max_lines) %}
+                  {% set ns.lines = ns.lines + [{'text': '', 'cont': false, 'active': false}] %}
+                {% endfor %}
+              {% endif %}
+
+              {{ ns.lines | to_json }}
+
+            line1_text: "{{ (layout_json | from_json)[0].text }}"
+            line1_cont: "{{ (layout_json | from_json)[0].cont }}"
+            line1_active: "{{ (layout_json | from_json)[0].active }}"
+            line2_text: "{{ (layout_json | from_json)[1].text }}"
+            line2_cont: "{{ (layout_json | from_json)[1].cont }}"
+            line2_active: "{{ (layout_json | from_json)[1].active }}"
+            line3_text: "{{ (layout_json | from_json)[2].text }}"
+            line3_cont: "{{ (layout_json | from_json)[2].cont }}"
+            line3_active: "{{ (layout_json | from_json)[2].active }}"
+            line4_text: "{{ (layout_json | from_json)[3].text }}"
+            line4_cont: "{{ (layout_json | from_json)[3].cont }}"
+            line4_active: "{{ (layout_json | from_json)[3].active }}"
+            line5_text: "{{ (layout_json | from_json)[4].text }}"
+            line5_cont: "{{ (layout_json | from_json)[4].cont }}"
+            line5_active: "{{ (layout_json | from_json)[4].active }}"
+            line6_text: "{{ (layout_json | from_json)[5].text }}"
+            line6_cont: "{{ (layout_json | from_json)[5].cont }}"
+            line6_active: "{{ (layout_json | from_json)[5].active }}"
+
+            line1_y: "{{ 50 if oncall_title != '' else 28 }}"
+            line2_y: "{{ 68 if oncall_title != '' else 46 }}"
+            line3_y: "{{ 84 if oncall_title != '' else 62 }}"
+            line4_y: "{{ 100 if oncall_title != '' else 78 }}"
+            line5_y: "{{ 116 if oncall_title != '' else 94 }}"
+            line6_y: "{{ '' if oncall_title != '' else 110 }}"
+
+            line1_draw_y: "{{ line1_y }}"
+            line2_draw_y: "{{ line2_y }}"
+            line3_draw_y: "{{ line3_y }}"
+            line4_draw_y: "{{ line4_y }}"
+            line5_draw_y: "{{ line5_y }}"
+            line6_draw_y: "{{ line6_y }}"
+
+        - action: open_epaper_link.drawcustom
+          target:
+            device_id: 5a117e6ec85503768c6a1ae26dfa8924
+          data:
+            background: white
+            rotate: 0
+            ttl: 300
+            dither: 0
+            payload:
+              - type: text
+                value: google Calendar
+                x: 7
+                y: 2
+                size: 18
+                color: black
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: text
+                value: "{{ header_date }}"
+                x: 246
+                y: 2
+                size: 18
+                color: black
+                anchor: rt
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: line
+                x_start: 0
+                x_end: 249
+                y_start: 22
+                y_end: 22
+                fill: black
+                width: 1
+
+              - type: rectangle
+                x_start: 0
+                x_end: 249
+                y_start: 26
+                y_end: 44
+                fill: red
+                outline: red
+                visible: "{{ oncall_title != '' }}"
+
+              - type: text
+                value: "{{ oncall_title }}"
+                x: 7
+                y: 28
+                size: 16
+                color: white
+                visible: "{{ oncall_title != '' }}"
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: rectangle
+                x_start: 2
+                x_end: 246
+                y_start: "{{ (line1_draw_y | default(0, true) | int) - 1 }}"
+                y_end: "{{ (line1_draw_y | default(0, true) | int) + 15 }}"
+                fill: black
+                outline: black
+                visible: "{{ (line1_active == 'True' or line1_active == true) and line1_text != '' }}"
+              - type: text
+                value: "{{ line1_text }}"
+                x: 7
+                y: "{{ line1_draw_y | default(0, true) | int }}"
+                size: 14
+                color: "{{ 'white' if (line1_active == 'True' or line1_active == true) else 'black' }}"
+                max_width: 240
+                truncate: true
+                visible: "{{ line1_text != '' }}"
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: rectangle
+                x_start: 2
+                x_end: 246
+                y_start: "{{ (line2_draw_y | default(0, true) | int) - 1 }}"
+                y_end: "{{ (line2_draw_y | default(0, true) | int) + 15 }}"
+                fill: black
+                outline: black
+                visible: "{{ (line2_active == 'True' or line2_active == true) and line2_text != '' }}"
+              - type: text
+                value: "{{ line2_text }}"
+                x: 7
+                y: "{{ line2_draw_y | default(0, true) | int }}"
+                size: 14
+                color: "{{ 'white' if (line2_active == 'True' or line2_active == true) else 'black' }}"
+                max_width: 240
+                truncate: true
+                visible: "{{ line2_text != '' }}"
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: rectangle
+                x_start: 2
+                x_end: 246
+                y_start: "{{ (line3_draw_y | default(0, true) | int) - 1 }}"
+                y_end: "{{ (line3_draw_y | default(0, true) | int) + 15 }}"
+                fill: black
+                outline: black
+                visible: "{{ (line3_active == 'True' or line3_active == true) and line3_text != '' }}"
+              - type: text
+                value: "{{ line3_text }}"
+                x: 7
+                y: "{{ line3_draw_y | default(0, true) | int }}"
+                size: 14
+                color: "{{ 'white' if (line3_active == 'True' or line3_active == true) else 'black' }}"
+                max_width: 240
+                truncate: true
+                visible: "{{ line3_text != '' }}"
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: rectangle
+                x_start: 2
+                x_end: 246
+                y_start: "{{ (line4_draw_y | default(0, true) | int) - 1 }}"
+                y_end: "{{ (line4_draw_y | default(0, true) | int) + 15 }}"
+                fill: black
+                outline: black
+                visible: "{{ (line4_active == 'True' or line4_active == true) and line4_text != '' }}"
+              - type: text
+                value: "{{ line4_text }}"
+                x: 7
+                y: "{{ line4_draw_y | default(0, true) | int }}"
+                size: 14
+                color: "{{ 'white' if (line4_active == 'True' or line4_active == true) else 'black' }}"
+                max_width: 240
+                truncate: true
+                visible: "{{ line4_text != '' }}"
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: rectangle
+                x_start: 2
+                x_end: 246
+                y_start: "{{ (line5_draw_y | default(0, true) | int) - 1 }}"
+                y_end: "{{ (line5_draw_y | default(0, true) | int) + 15 }}"
+                fill: black
+                outline: black
+                visible: "{{ (line5_active == 'True' or line5_active == true) and line5_text != '' }}"
+              - type: text
+                value: "{{ line5_text }}"
+                x: 7
+                y: "{{ line5_draw_y | default(0, true) | int }}"
+                size: 14
+                color: "{{ 'white' if (line5_active == 'True' or line5_active == true) else 'black' }}"
+                max_width: 240
+                truncate: true
+                visible: "{{ line5_text != '' }}"
+                font: DejaVuSansCondensed-Bold.ttf
+
+              - type: rectangle
+                x_start: 2
+                x_end: 246
+                y_start: "{{ ((line6_draw_y | default(0, true) | int) - 1) if line6_draw_y != '' else 0 }}"
+                y_end: "{{ ((line6_draw_y | default(0, true) | int) + 15) if line6_draw_y != '' else 0 }}"
+                fill: black
+                outline: black
+                visible: "{{ (line6_active == 'True' or line6_active == true) and line6_text != '' and line6_draw_y != '' }}"
+              - type: text
+                value: "{{ line6_text }}"
+                x: 7
+                y: "{{ line6_draw_y | default(0, true) | int if line6_draw_y != '' else 0 }}"
+                size: 14
+                color: "{{ 'white' if (line6_active == 'True' or line6_active == true) else 'black' }}"
+                max_width: 240
+                truncate: true
+                visible: "{{ line6_text != '' and line6_draw_y != '' }}"
+                font: DejaVuSansCondensed-Bold.ttf
+
+  automation:
+    - alias: Update Google calendar tag every 30 min no wrap
+      id: update_google_calendar_tag
+      trigger:
+        - platform: time_pattern
+          minutes: "/30"
+        - platform: homeassistant
+          event: start
+      action:
+        - action: script.update_google_calendar_tag_no_wrap
