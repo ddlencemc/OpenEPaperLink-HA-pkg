@@ -1,0 +1,222 @@
+pricetag_oepl_bathroom_1:
+
+  automation:
+    alias: EPaper Tags - Bathroom1 Data
+    description: ""
+    trigger:
+      - platform: state
+        entity_id: switch.fan_bathroom_1_l1
+        id: fan_l1
+
+      - platform: state
+        entity_id: switch.fan_bathroom_1_l2
+        id: fan_l2
+
+      - platform: state
+        entity_id: sensor.bathroom1_temp_humidity_temperature
+        id: temperature
+
+      - platform: state
+        entity_id: sensor.bathroom1_temp_humidity_humidity
+        id: humidity
+
+      - platform: state
+        entity_id: climate.termostat_heating_bb
+        id: thermostat
+
+      - platform: state
+        entity_id: switch.switch_bathroom_1_left
+        id: light_left
+
+      - platform: state
+        entity_id: switch.switch_bathroom_1_right
+        id: light_right
+
+    condition:
+      - condition: template
+        value_template: >-
+          {{
+            is_state('switch.switch_bathroom_1_left', 'on')
+            or is_state('switch.switch_bathroom_1_right', 'on')
+          }}
+
+      - condition: template
+        value_template: >-
+          {% if trigger.id == 'temperature' %}
+            {{
+              (trigger.to_state.state | float(0) | round(1))
+              !=
+              (trigger.from_state.state | float(0) | round(1))
+            }}
+
+          {% elif trigger.id == 'humidity' %}
+            {{
+              (trigger.to_state.state | float(0) | round(0))
+              !=
+              (trigger.from_state.state | float(0) | round(0))
+            }}
+
+          {% elif trigger.id == 'thermostat' %}
+            {{
+              trigger.to_state.state != trigger.from_state.state
+              or
+              (
+                (trigger.to_state.attributes.temperature | float(0) | round(1))
+                !=
+                (trigger.from_state.attributes.temperature | float(0) | round(1))
+              )
+            }}
+
+          {% elif trigger.id == 'light_left' %}
+            {{
+              trigger.from_state is not none
+              and trigger.from_state.state == 'off'
+              and trigger.to_state.state == 'on'
+              and is_state('switch.switch_bathroom_1_right', 'off')
+            }}
+
+          {% elif trigger.id == 'light_right' %}
+            {{
+              trigger.from_state is not none
+              and trigger.from_state.state == 'off'
+              and trigger.to_state.state == 'on'
+              and is_state('switch.switch_bathroom_1_left', 'off')
+            }}
+
+          {% else %}
+            true
+          {% endif %}
+
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.id in ['light_left', 'light_right'] }}"
+            sequence: []
+        default:
+          - delay: "00:00:20"
+
+      - condition: template
+        value_template: >-
+          {{
+            is_state('switch.switch_bathroom_1_left', 'on')
+            or is_state('switch.switch_bathroom_1_right', 'on')
+          }}
+
+      - service: open_epaper_link.clear_pending
+        target:
+          device_id:
+            - 350cf61da35b27a8c1a56518b28f97e2
+
+      - service: open_epaper_link.drawcustom
+        data:
+          background: white
+          rotate: 0
+          payload:
+            - type: text
+              value: "Bathroom"
+              font: DejaVuSansCondensed-Bold.ttf
+              x: 148
+              y: 8
+              size: 14
+              color: black
+              anchor: mt
+
+            - type: icon
+              value: mdi:thermometer
+              x: 13
+              y: 27
+              size: 32
+              color: black
+
+            - type: text
+              value: >-
+                {{ states('sensor.bathroom1_temp_humidity_temperature') | float(0) | round(1) }}°
+              font: DejaVuSansCondensed-Bold.ttf
+              x: 43
+              y: 32
+              size: 28
+              color: red
+              anchor: lt
+
+            - type: icon
+              value: >-
+                {% if is_state('switch.fan_bathroom_1_l2', 'on') %}
+                  mdi:fan-speed-2
+                {% elif is_state('switch.fan_bathroom_1_l1', 'on') %}
+                  mdi:fan-speed-1
+                {% else %}
+                  mdi:fan-off
+                {% endif %}
+              x: 140
+              y: 27
+              size: 32
+              color: >-
+                {% if is_state('switch.fan_bathroom_1_l1', 'on') or is_state('switch.fan_bathroom_1_l2', 'on') %}
+                  red
+                {% else %}
+                  black
+                {% endif %}
+
+            - type: text
+              value: >-
+                {% if is_state('switch.fan_bathroom_1_l1', 'on') or is_state('switch.fan_bathroom_1_l2', 'on') %}
+                  On
+                {% else %}
+                  Off
+                {% endif %}
+              font: DejaVuSansCondensed-Bold.ttf
+              x: 175
+              y: 32
+              size: 28
+              color: black
+              anchor: lt
+
+            - type: icon
+              value: mdi:water-percent
+              x: 13
+              y: 69
+              size: 32
+              color: black
+
+            - type: text
+              value: >-
+                {{ states('sensor.bathroom1_temp_humidity_humidity') | float(0) | round(0) }}%
+              font: DejaVuSansCondensed-Bold.ttf
+              x: 43
+              y: 72
+              size: 28
+              color: black
+              anchor: lt
+
+            - type: icon
+              value: mdi:radiator
+              x: 140
+              y: 69
+              size: 32
+              color: >-
+                {% if not is_state('climate.termostat_heating_bb', 'off') %}
+                  red
+                {% else %}
+                  black
+                {% endif %}
+
+            - type: text
+              value: >-
+                {% if is_state('climate.termostat_heating_bb', 'off') %}
+                  Off
+                {% else %}
+                  {{ state_attr('climate.termostat_heating_bb', 'temperature') | float(0) | round(1) }}°
+                {% endif %}
+              font: DejaVuSansCondensed-Bold.ttf
+              x: 175
+              y: 72
+              size: 28
+              color: black
+              anchor: lt
+
+        target:
+          device_id:
+            - 350cf61da35b27a8c1a56518b28f97e2
+
+    mode: restart
