@@ -1,0 +1,160 @@
+pricetag_oepl_weather:
+
+  automation:
+    alias: EPaper Tags - Weatherman Data
+    description: ""
+    trigger:
+      - platform: time_pattern
+        minutes: "/30"
+    condition:
+      - condition: time
+        after: "07:00:00"
+        before: "02:00:00"
+    variables:
+      severe_weather: ['fog','hail','lightning','lightning-rainy','pouring','snowy','snowy-rainy','windy','windy-variant','exceptional']
+      severe_temp_low: 3
+    action:
+      - service: open_epaper_link.drawcustom
+        data:
+          background: white
+          rotate: 0
+          payload:
+          # ТЕКУЩАЯ ПОГОДА СЛЕВА
+          - type: icon
+            value: >-
+              weather-{{ state_attr('sensor.weatherman_data_tag','wm_cond_now') | string }}
+            x: 18
+            y: 8
+            size: 60
+            color: >-
+              {{ 'red' if state_attr('sensor.weatherman_data_tag','wm_cond_now') in severe_weather else 'black' }}
+
+          - type: text
+            value: >-
+              {{ state_attr('sensor.weatherman_data_tag','wm_temp_now') | round | int(0.0) }}°
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 68
+            y: 80
+            size: 45
+            anchor: mt
+            color: red
+             # {{ 'black' if state_attr('sensor.weatherman_data_tag','wm_temp_now') | round > severe_temp_low else 'red' }}
+
+          # ПРАВЫЙ БЛОК 1
+          - type: text
+            value: >-
+              {{ ((as_timestamp(now()) + 86400) | timestamp_custom('%d/%m', true)) }}
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 115
+            y: 8
+            size: 12
+            color: black
+            anchor: mt
+
+          - type: icon
+            value: >-
+              weather-{{ state_attr('sensor.weatherman_data_tag','wm_cond_4') | string }}
+            x: 94
+            y: 22
+            size: 45
+            color: >-
+              {{ 'red' if state_attr('sensor.weatherman_data_tag','wm_cond_4') in severe_weather else 'black' }}
+
+          - type: text
+            value: >-
+              {{ state_attr('sensor.weatherman_data_tag','wm_temp_4') | string }}°/{{ state_attr('sensor.weatherman_data_tag','wm_temp_4_low') | string }}°
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 115
+            y: 64
+            size: 12
+            color: black
+            anchor: mt
+
+          # ПРАВЫЙ БЛОК 2
+          - type: text
+            value: >-
+              {{ ((as_timestamp(now()) + 86400 * 2) | timestamp_custom('%d/%m', true)) }}
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 170
+            y: 8
+            size: 12
+            color: black
+            anchor: mt
+
+          - type: icon
+            value: >-
+              weather-{{ state_attr('sensor.weatherman_data_tag','wm_cond_5') | string }}
+            x: 148
+            y: 22
+            size: 45
+            color: >-
+              {{ 'red' if state_attr('sensor.weatherman_data_tag','wm_cond_5') in severe_weather else 'black' }}
+
+          - type: text
+            value: >-
+              {{ state_attr('sensor.weatherman_data_tag','wm_temp_5') | string }}°/{{ state_attr('sensor.weatherman_data_tag','wm_temp_5_low') | string }}°
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 170
+            y: 64
+            size: 12
+            color: black
+            anchor: mt
+
+          # ПРАВЫЙ БЛОК 3
+          - type: text
+            value: >-
+              {{ ((as_timestamp(now()) + 86400 * 3) | timestamp_custom('%d/%m', true)) }}
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 225
+            y: 8
+            size: 12
+            color: black
+            anchor: mt
+
+          - type: icon
+            value: >-
+              weather-{{ state_attr('sensor.weatherman_data_tag','wm_cond_6') | string }}
+            x: 200
+            y: 22
+            size: 45
+            color: >-
+              {{ 'red' if state_attr('sensor.weatherman_data_tag','wm_cond_6') in severe_weather else 'black' }}
+
+          - type: text
+            value: >-
+              {{ state_attr('sensor.weatherman_data_tag','wm_temp_6') | string }}°/{{ state_attr('sensor.weatherman_data_tag','wm_temp_6_low') | string }}°
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 225
+            y: 64
+            size: 12
+            color: black
+            anchor: mt
+
+          # ТЕКУЩИЙ ДЕНЬ: МАКС/МИН НИЖЕ ПРОГНОЗА НА 3 ДНЯ
+          - type: text
+            value: >-
+              Сегодня {{ state_attr('sensor.weatherman_data_tag','wm_temp_today') | string }}°/{{ state_attr('sensor.weatherman_data_tag','wm_temp_today_low') | string }}°
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 170
+            y: 90
+            size: 12
+            color: black
+            anchor: mt
+
+          # НИЖНЯЯ СТРОКА ОБНОВЛЕНИЯ
+          - type: text
+            value: >-
+              upd {{ now().strftime('%d/%m %H:%M') }}
+            font: DejaVuSansCondensed-Bold.ttf
+            x: 182
+            y: 116
+            size: 8
+            color: black
+            anchor: mm
+        target:
+          device_id:
+            - 34652ab7855e4f80aa79d161d73bab54 # bedroom
+            - cfb3338bf42c8ca5f38d2991f9018a7a # kitchen
+            - 05c857b828c5c684b2badec81b2682c5 # cabinet
+
+    mode: restart
